@@ -15,7 +15,7 @@ json_data = json.loads(blob)
 data_str = u"\n".join(etl(item) for item in json_data)
 
 print(data_str)
-data_file = io.BytesIO(data_str.encode())
+data_file = io.StringIO(data_str.encode())
 
 # This data file is ready for BigQuery as Newline delimited JSON
 print(data_file)
