@@ -1,0 +1,21 @@
+import io
+import json
+
+def etl(item):
+    return json.dumps(item)
+
+# Text file loaded as a blob
+blob = """
+        [
+{"id":"1","first_name":"John"},
+{"id":"2","first_name":"Mary"}
+]
+"""
+json_data = json.loads(blob)
+data_str = u"\n".join(etl(item) for item in json_data)
+
+print(data_str)
+data_file = io.BytesIO(data_str.encode())
+
+# This data file is ready for BigQuery as Newline delimited JSON
+print(data_file)
