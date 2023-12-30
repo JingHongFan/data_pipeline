@@ -1,154 +1,27 @@
-import sys
-import os
-import json
-import glob
+# Create a file first: ./very_big_file.csv as:
+# transaction_id,user_id,total_cost,dt
+# 1,John,10.99,2023-04-15
+# 2,Mary, 4.99,2023-04-12
 
 
-from borneo import (
-    AuthorizationProvider, DeleteRequest, GetRequest,
-    IllegalArgumentException, NoSQLHandle, NoSQLHandleConfig, PutRequest,
-    QueryRequest, Regions, TableLimits, TableRequest)
-from borneo.iam import SignatureProvider
-from borneo.kv import StoreAccessTokenProvider
-from oci.config import from_file
+# Example.py
+def etl(item):
+    # Do some etl here
+    return item.replace("John", '****') 
 
+# Create a generator 
+def batch_read_file(file_object, batch_size=19):
+    """Lazy function (generator) can read a file in chunks.
+    Default chunk: 1024 bytes."""
+    while True:
+        data = file_object.read(batch_size)
+        if not data:
+            break
+        yield data
+# and read in chunks
+with open('very_big_file.csv') as f:
+    for batch in batch_read_file(f):
+        print(etl(batch))
 
-#
-# EDIT: these values based on desired region and/or endpoint for a local
-# server
-#
-cloud_region = None
-
-
-# Cloud Service Only
-#
-# EDIT: set these variables to the credentials to use if you are not using
-# a configuration file in ~/.oci/config
-# Use of these credentials vs a file is determined by a value of tenancy
-# other than None.
-#
-tenancy = None  # tenancy'd OCID (string)
-user = None  # user's OCID (string)
-private_key = 'path-to-private-key-or-private-key-content'
-fingerprint = 'fingerprint for uploaded public key'
-# pass phrase (string) for private key, or None if not set
-pass_phrase = None
-
-class CloudsimAuthorizationProvider(AuthorizationProvider):
-    """
-    Cloud Simulator Only.
-    This class is used as an AuthorizationProvider when using the Cloud
-    Simulator, which has no security configuration. It accepts a string
-    tenant_id that is used as a simple namespace for tables.
-    """
-
-    def __init__(self, tenant_id):
-        super(CloudsimAuthorizationProvider, self).__init__()
-        self._tenant_id = tenant_id
-
-    def close(self):
-        pass
-
-    def get_authorization_string(self, request=None):
-        return 'Bearer ' + self._tenant_id
-
-
-def get_handle(nosql_env, nosql_compartment):
-    """
-    Returns a NoSQLHandle based on the requested environment. The
-    differences among the supported environments are encapsulated in this
-    method.
-    """
-    if nosql_env == 'cloud':
-        endpoint = cloud_region
-        #
-        # Get credentials using SignatureProvider. SignatureProvider has
-        # several ways to accept credentials. See the documentation:
-        #  https://nosql-python-sdk.readthedocs.io/en/stable/api/borneo.iam.SignatureProvider.html
-        #
-        if tenancy is not None:
-            print('Using directly provided credentials')
-            #
-            # Credentials are provided directly
-            #
-            provider = SignatureProvider(tenant_id=tenancy,
-                                         user_id=user,
-                                         fingerprint=fingerprint,
-                                         private_key=private_key,
-                                         pass_phrase=pass_phrase)
-        else:
-            #
-            # Credentials will come from a file.
-            #
-            # By default the file is ~/.oci/config. A config_file = <path>
-            # argument can be passed to specify a different file.
-            #
-            print('Using credentials and DEFAULT profile from ' +
-                  '~/.oci/config')
-            provider = SignatureProvider()
-            oci_config = from_file()
-
-            endpoint= eval('Regions.'+str.upper(oci_config.get('region')).replace('-','_'))
-            
-
-    else:
-        raise IllegalArgumentException('Unknown environment: ' + nosql_env)
-
-    return NoSQLHandle(NoSQLHandleConfig(endpoint, provider).set_default_compartment(nosql_compartment))
-def main():
-
-    table_name = 'Bakeryproduct'
-    data=''
-
-    if len(sys.argv) != 3:
-        print('Usage: python createtable.py cloud compartment_id')
-        raise SystemExit
-
-    nosql_env = sys.argv[1:][0]
-    nosql_compartment= sys.argv[2:][0]
-    print('Using compartment: ' + str(nosql_compartment))
-    print('Using environment: ' + str(nosql_env))
-
-    handle = None
-    try:
-
-        #
-        # Create a handle
-        #
-        handle = get_handle(nosql_env, nosql_compartment )
-
-        #
-        # Create a table
-        #
-        statement = (
-            'CREATE TABLE if not exists {}( id INTEGER, type STRING, name STRING, ppu Double, batters JSON, PRIMARY KEY ( id ) )').format(table_name)
-        request = TableRequest().set_statement(statement).set_table_limits(
-            TableLimits(30, 10, 1))
-        handle.do_table_request(request, 50000, 3000)
-        print('Table is Created')
-        # Put a few rows
-        #
-        #
-        path_to_json = '/home/opc/sample/'
-        json_files = ''
-        json_files = os.path.join(path_to_json, '*.json')
-        file_list = glob.glob(json_files)
-        for file in file_list:
-            with open(file) as jfile:
-                data = json.load(jfile)
-                request = PutRequest().set_table_name(table_name)
-                request.set_value(data)
-                handle.put(request)
-
-
-        print('Data load is complete')
-    except Exception as e:
-        print(e)
-    finally:
-        # If the handle isn't closed Python will not exit properly
-        if handle is not None:
-            handle.close()
-
-
-if __name__ == '__main__':
-    main()
+# In command line run
+# Python example.py
